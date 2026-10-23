@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>沪深两市成交额 & 融资余额 & 北向资金</title>
+    <style>
+        /* 全局与基础重置 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; padding: 15px; }
+        
+        /* 头部与导航 */
+        h1 { text-align: center; font-size: 18px; margin: 10px 0; }
+        .time-bar { text-align: center; font-size: 12px; color: #666; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; gap: 10px; }
+        .time-bar b { color: #e53935; }
+        button { border: 1px solid #f5a623; background: #fff; color: #c07a00; border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 12px; }
+        
+        /* 核心三栏布局 */
+        .container { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; max-width: 1600px; margin: 0 auto; }
+        @media (max-width: 1200px) { .container { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 800px) { .container { grid-template-columns: 1fr; } }
+
+        /* 卡片模块样式 */
+        .card { background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); display: flex; flex-direction: column; }
+        .card h3 { background: #f5a623; color: #fff; text-align: center; padding: 10px; font-size: 15px; font-weight: normal; }
+        .chart-area { padding: 15px 10px 5px; min-height: 280px; display: flex; align-items: flex-end; justify-content: space-between; gap: 2px; }
+        .bar-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; cursor: pointer; }
+        .bar-val { font-size: 11px; font-weight: bold; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center; }
+        .bar-fill { width: 100%; border-radius: 3px 3px 0 0; min-height: 5px; max-height: 220px; }
+        .bar-date { font-size: 11px; color: #999; margin-top: 6px; }
+
+        /* 表格样式 */
+        .table-wrap { margin-top: auto; border-top: 1px solid #eee; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 350px; }
+        th, td { padding: 8px 4px; text-align: center; white-space: nowrap; }
+        th { background: #fff8e1; color: #666; font-weight: 600; font-size: 12px; border-bottom: 1px solid #f5a623; }
+        tr:nth-child(even) { background: #fafafa; }
+        .up { color: #e53935; font-weight: bold; }
+        .down { color: #2e7d32; font-weight: bold; }
+        .dash { color: #999; }
+        
+        /* 底部提示 */
+        .footer-tip { text-align: center; font-size: 12px; color: #999; margin-top: 25px; padding-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+<h1>沪深两市成交额 & 融资余额 & 北向资金</h1>
+<div class="time-bar">数据更新时间：<b id="updateTime">--</b> <button onclick="loadAllData()">刷新数据</button></div>
+
+<div class="container">
+    <!-- 模块一：两市成交额 -->
+    <div class="card">
+        <h3>两市成交额（亿元）</h3>
+        <div class="chart-area" id="chartVolume"></div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>日期</th><th>沪市</th><th>深市</th><th>合计</th><th>相比上日</th></tr></thead>
+                <tbody id="tbVolume"><tr><td colspan="5" class="dash">加载中…</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 模块二：融资余额 -->
+    <div class="card">
+        <h3>两市融资余额（亿元）</h3>
+        <div class="chart-area" id="chartMargin"></div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>日期</th><th>融资余额</th><th>相比上日</th></tr></thead>
+                <tbody id="tbMargin"><tr><td colspan="3" class="dash">加载中…</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 模块三：北向资金成交额（交易前一日数据） -->
+    <div class="card">
+        <h3>北向资金成交额（交易前一日/亿元）</h3>
+        <div class="chart-area" id="chartNorth"></div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>日期</th><th>沪股通</th><th>深股通</th><th>合计</th><th>相比上日</th></tr></thead>
+                <tbody id="tbNorth"><tr><td colspan="5" class="dash">加载中…</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="footer-tip">注：北向资金数据为每日盘后（18:00后）更新，显示前一交易日最终成交额；红涨绿跌，合计额为自动计算。</div>
+
+<script>
+// 定义通用颜色
+const COLOR_UP = '#e53935';    // 红色：代表增加
+const COLOR_DOWN = '#2e7d32';  // 绿色：代表缩小
+
+// ==========================================
+// 1. 模拟数据源（实际开发中在此处对接你的后端API）
+// ==========================================
+const MOCK_DATA = {
+    // 两市成交额
+    volume: [
+        { date: '10-22', sh: 8986.67, sz: 10575.91, total: 19562.58 },
+        { date: '10-21', sh: 7060.96, sz: 8226.11, total: 15287.08 },
+        { date: '10-20', sh: 6427.52, sz: 7865.93, total: 14293.44 },
+        { date: '10-19', sh: 6999.70, sz: 7561.37, total: 14561.07 },
+        { date: '10-18', sh: 6870.10, sz: 7504.95, total: 14375.05 }
+    ],
+    // 融资余额
+    margin: [
+        { date: '10-22', val: 24289.14 },
+        { date: '10-21', val: 24302.77 },
+        { date: '10-20', val: 24312.45 },
+        { date: '10-19', val: 24333.74 },
+        { date: '10-18', val: 24397.06 }
+    ],
+    // 北向资金（交易前一日数据，此处以10月23日页面显示10月22日为例）
+    north: [
+        { date: '2026-10-22', hgt: 1133.27, sgt: 1192.95 },
+        { date: '2026-10-21', hgt: 1050.44, sgt: 1120.55 },
+        { date: '2026-10-20', hgt: 1100.12, sgt: 1150.88 },
+        { date: '2026-10-19', hgt: 980.55, sgt: 1020.11 },
+        { date: '2026-10-18', hgt: 1050.66, sgt: 1110.22 }
+    ]
+};
+
+// ==========================================
+// 2. 工具函数
+// ==========================================
+// 格式化数字
+function fmt(n) { 
+    if(n == null || isNaN(n)) return '—'; 
+    return Number(n).toLocaleString('zh-CN', { maximumFractionDigits: 2 }); 
+}
+// 计算环比差异（返回文本和颜色class）
+function diff(cur, prev) {
+    if (cur == null || prev == null) return { t: '—', c: 'dash' };
+    let d = cur - prev;
+    let sign = d > 0 ? '+' : '';
+    return { 
+        t: sign + d.toLocaleString('zh-CN', { maximumFractionDigits: 2 }), 
+        c: d > 0 ? 'up' : (d < 0 ? 'down' : 'dash') 
+    };
+}
+// 获取柱子颜色
+function getBarColor(cur, prev) {
+    if (cur == null || prev == null) return '#999';
+    return (cur >= prev) ? COLOR_UP : COLOR_DOWN;
+}
+
+// ==========================================
+// 3. 核心渲染函数
+// ==========================================
+// 绘制柱状图 (containerId, 数据列表, 取值键名, 是否是北向)
+function drawChart(containerId, data, key, isNorth = false) {
+    const container = document.getElementById(containerId);
+    if (!data || data.length === 0) { container.innerHTML = '<span class="dash" style="margin:auto">暂无数据</span>'; return; }
+
+    // 如果是北向资金，先自动计算合计
+    let chartData = data.map(item => {
+        if (isNorth) {
+            return { ...item, total: item.hgt + item.sgt };
+        }
+        return item;
+    });
+
+    // 寻找最大值用于设定柱子高度比例
+    let maxVal = 0;
+    chartData.forEach(item => { if (item[key] > maxVal) maxVal = item[key]; });
+    if (maxVal === 0) maxVal = 1;
+
+    let html = '';
+    chartData.forEach((item, i) => {
+        let prev = i > 0 ? chartData[i-1][key] : null;
+        let val = item[key];
+        let heightPct = (val / maxVal) * 100;
+        let color = isNorth ? (val >= 0 ? COLOR_UP : COLOR_DOWN) : getBarColor(val, prev);
+        
+        html += `<div class="bar-col">`;
+        html += `<div class="bar-val" style="color:${color}">${fmt(val)}</div>`;
+        html += `<div class="bar-fill" style="height:${heightPct}%; background:${color}"></div>`;
+        html += `<div class="bar-date">${item.date}</div>`;
+        html += `</div>`;
+    });
+    container.innerHTML = html;
+}
+
+// 渲染表格 (tableId, 数据列表, 类型)
+function drawTable(tableId, data, type) {
+    const tbody = document.getElementById(tableId);
+    if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="dash">暂无数据</td></tr>'; return; }
+
+    let html = '';
+    data.forEach((item, i) => {
+        let dateStr = item.date;
+        let tdContent = `<td>${dateStr}</td>`;
+        let diffHtml = '';
+
+        if (type === 'volume') {
+            // 成交额
+            let prevTotal = (i < data.length - 1) ? data[i+1].total : null;
+            let d = diff(item.total, prevTotal);
+            tdContent += `<td>${fmt(item.sh)}</td><td>${fmt(item.sz)}</td>`;
+            tdContent += `<td class="up">${fmt(item.total)}</td><td class="${d.c}">${d.t}</td>`;
+        } else if (type === 'margin') {
+            // 融资余额
+            let prevVal = (i < data.length - 1) ? data[i+1].val : null;
+            let d = diff(item.val, prevVal);
+            tdContent += `<td class="up">${fmt(item.val)}</td><td class="${d.c}">${d.t}</td>`;
+        } else if (type === 'north') {
+            // 北向资金（自动计算合计）
+            let total = item.hgt + item.sgt;
+            let prevTotal = (i < data.length - 1) ? (data[i+1].hgt + data[i+1].sgt) : null;
+            let d = diff(total, prevTotal);
+            tdContent += `<td>${fmt(item.hgt)}</td><td>${fmt(item.sgt)}</td>`;
+            tdContent += `<td class="up">${fmt(total)}</td><td class="${d.c}">${d.t}</td>`;
+        }
+        html += `<tr>${tdContent}</tr>`;
+    });
+    tbody.innerHTML = html;
+}
+
+// ==========================================
+// 4. 页面初始化与加载
+// ==========================================
+function loadAllData() {
+    // 1. 渲染两市成交额
+    drawChart('chartVolume', MOCK_DATA.volume, 'total', false);
+    drawTable('tbVolume', MOCK_DATA.volume, 'volume');
+
+    // 2. 渲染融资余额
+    drawChart('chartMargin', MOCK_DATA.margin, 'val', false);
+    drawTable('tbMargin', MOCK_DATA.margin, 'margin');
+
+    // 3. 渲染北向资金
+    drawChart('chartNorth', MOCK_DATA.north, 'total', true);
+    drawTable('tbNorth', MOCK_DATA.north, 'north');
+
+    // 更新时间戳
+    document.getElementById('updateTime').textContent = new Date().toLocaleString('zh-CN');
+}
+
+// 页面加载完成后自动执行
+window.onload = loadAllData;
+</script>
+</body>
+</html>
