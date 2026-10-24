@@ -16,15 +16,44 @@ def fetch_north_data():
         print("正在获取深股通数据...")
         df_sz = ak.stock_hsgt_hist_em(symbol="深股通")
         
-        if df_sh.empty or df_sz.empty:
+        if df_sh is None or df_sh.empty or df_sz is None or df_sz.empty:
             print("警告：未获取到完整的沪深股通数据。")
             return
+            
+        # 打印一下列名，方便以后排查
+        print("沪股通数据列名:", df_sh.columns.tolist())
 
-        # 提取需要的列，并重命名以便合并
-        # 接口返回的列通常包含：日期, 买入成交额, 卖出成交额
-        # 我们计算总成交额 = 买入 + 卖出
-        df_sh['沪股通成交额'] = df_sh['买入成交额'] + df_sh['卖出成交额']
-        df_sz['深股通成交额'] = df_sz['买入成交额'] + df_sz['卖出成交额']
+        # 清洗数据的内部函数：把各种奇怪格式转为纯数字，处理 NaN
+        def safe_float(val):
+            if pd.isna(val): return 0.0
+            if isinstance(val, (int, float)): return float(val)
+            val_str = str(val).replace('亿', '').replace(',', '').strip()
+            try:
+                return float(val_str)
+            except:
+                return 0.0
+
+        # 尝试计算总成交额（兼容各种可能改版的接口）
+        def get_turnover(df):
+            # 情况1：直接有“成交总额”或“成交额”列
+            for col in ['成交总额', '成交额']:
+                if col in df.columns:
+                    return df[col].apply(safe_float)
+            
+            # 情况2：只有“买入成交额”和“卖出成交额”
+            if '买入成交额' in df.columns and '卖出成交额' in df.columns:
+                return df['买入成交额'].apply(safe_float) + df['卖出成交额'].apply(safe_float)
+                
+            # 情况3：实在没有，返回全0（防止出现NaN导致前端崩溃）
+            print("警告：未能找到成交额相关的列，返回0")
+            return pd.Series([0.0] * len(df))
+
+        df_sh['沪股通成交额'] = get_turnover(df_sh)
+        df_sz['深股通成交额'] = get_turnover(df_sz)
+        
+        # 确保日期格式统一（防止一个是 datetime 一个是 string）
+        df_sh['日期'] = df_sh['日期'].astype(str)
+        df_sz['日期'] = df_sz['日期'].astype(str)
         
         # 按日期合并
         merged_df = pd.merge(df_sh[['日期', '沪股通成交额']], df_sz[['日期', '深股通成交额']], on='日期', how='inner')
