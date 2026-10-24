@@ -1,6 +1,223 @@
 {
-  "update_time": "2026-10-24 00:12:10",
-  "turnover": [],
+  "update_time": "2026-10-24 00:16:46",
+  "turnover": [
+    {
+      "date": "2026-09-04",
+      "sh_amount": 537.29,
+      "sz_amount": 678.48,
+      "total": 1215.77,
+      "compare": null
+    },
+    {
+      "date": "2026-09-07",
+      "sh_amount": 477.38,
+      "sz_amount": 587.63,
+      "total": 1065.01,
+      "compare": -150.76
+    },
+    {
+      "date": "2026-09-08",
+      "sh_amount": 529.99,
+      "sz_amount": 644.28,
+      "total": 1174.27,
+      "compare": 109.26
+    },
+    {
+      "date": "2026-09-09",
+      "sh_amount": 517.5,
+      "sz_amount": 603.14,
+      "total": 1120.64,
+      "compare": -53.63
+    },
+    {
+      "date": "2026-09-10",
+      "sh_amount": 484.68,
+      "sz_amount": 559.02,
+      "total": 1043.7,
+      "compare": -76.94
+    },
+    {
+      "date": "2026-09-11",
+      "sh_amount": 579.12,
+      "sz_amount": 636.09,
+      "total": 1215.21,
+      "compare": 171.51
+    },
+    {
+      "date": "2026-09-14",
+      "sh_amount": 458.89,
+      "sz_amount": 508.97,
+      "total": 967.86,
+      "compare": -247.35
+    },
+    {
+      "date": "2026-09-15",
+      "sh_amount": 440.91,
+      "sz_amount": 530.71,
+      "total": 971.62,
+      "compare": 3.76
+    },
+    {
+      "date": "2026-09-16",
+      "sh_amount": 459.13,
+      "sz_amount": 530.9,
+      "total": 990.03,
+      "compare": 18.41
+    },
+    {
+      "date": "2026-09-17",
+      "sh_amount": 452.89,
+      "sz_amount": 558.26,
+      "total": 1011.15,
+      "compare": 21.12
+    },
+    {
+      "date": "2026-09-18",
+      "sh_amount": 485.71,
+      "sz_amount": 597.15,
+      "total": 1082.86,
+      "compare": 71.71
+    },
+    {
+      "date": "2026-09-21",
+      "sh_amount": 502.35,
+      "sz_amount": 631.71,
+      "total": 1134.06,
+      "compare": 51.2
+    },
+    {
+      "date": "2026-09-22",
+      "sh_amount": 506.15,
+      "sz_amount": 645.79,
+      "total": 1151.94,
+      "compare": 17.88
+    },
+    {
+      "date": "2026-09-23",
+      "sh_amount": 466.91,
+      "sz_amount": 585.24,
+      "total": 1052.15,
+      "compare": -99.79
+    },
+    {
+      "date": "2026-09-24",
+      "sh_amount": 438.53,
+      "sz_amount": 526.25,
+      "total": 964.78,
+      "compare": -87.37
+    },
+    {
+      "date": "2026-09-28",
+      "sh_amount": 452.35,
+      "sz_amount": 540.17,
+      "total": 992.52,
+      "compare": 27.74
+    },
+    {
+      "date": "2026-09-29",
+      "sh_amount": 399.47,
+      "sz_amount": 482.7,
+      "total": 882.17,
+      "compare": -110.35
+    },
+    {
+      "date": "2026-09-30",
+      "sh_amount": 414.56,
+      "sz_amount": 494.39,
+      "total": 908.95,
+      "compare": 26.78
+    },
+    {
+      "date": "2026-10-08",
+      "sh_amount": 482.2,
+      "sz_amount": 532.98,
+      "total": 1015.18,
+      "compare": 106.23
+    },
+    {
+      "date": "2026-10-09",
+      "sh_amount": 535.15,
+      "sz_amount": 632.49,
+      "total": 1167.64,
+      "compare": 152.46
+    },
+    {
+      "date": "2026-10-12",
+      "sh_amount": 461.45,
+      "sz_amount": 535.98,
+      "total": 997.43,
+      "compare": -170.21
+    },
+    {
+      "date": "2026-10-13",
+      "sh_amount": 483.31,
+      "sz_amount": 561.76,
+      "total": 1045.07,
+      "compare": 47.64
+    },
+    {
+      "date": "2026-10-14",
+      "sh_amount": 445.96,
+      "sz_amount": 489.03,
+      "total": 934.99,
+      "compare": -110.08
+    },
+    {
+      "date": "2026-10-15",
+      "sh_amount": 510.16,
+      "sz_amount": 551.17,
+      "total": 1061.33,
+      "compare": 126.34
+    },
+    {
+      "date": "2026-10-16",
+      "sh_amount": 472.63,
+      "sz_amount": 550.78,
+      "total": 1023.41,
+      "compare": -37.92
+    },
+    {
+      "date": "2026-10-19",
+      "sh_amount": 417.79,
+      "sz_amount": 493.77,
+      "total": 911.56,
+      "compare": -111.85
+    },
+    {
+      "date": "2026-10-20",
+      "sh_amount": 408.69,
+      "sz_amount": 469.76,
+      "total": 878.45,
+      "compare": -33.11
+    },
+    {
+      "date": "2026-10-21",
+      "sh_amount": 378.29,
+      "sz_amount": 471.16,
+      "total": 849.45,
+      "compare": -29.0
+    },
+    {
+      "date": "2026-10-22",
+      "sh_amount": 437.69,
+      "sz_amount": 525.77,
+      "total": 963.46,
+      "compare": 114.01
+    },
+    {
+      "date": "2026-10-23",
+      "sh_amount": 552.84,
+      "sz_amount": 690.12,
+      "total": 1242.96,
+      "compare": 279.5
+    }
+  ],
   "margin": [],
-  "main_fund": []
+  "main_fund": [
+    {
+      "date": "2026-10-23",
+      "total": -74.93,
+      "compare": null
+    }
+  ]
 }
