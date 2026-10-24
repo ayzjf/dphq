@@ -1,89 +1,77 @@
+# scripts/fetch_north.py
 import requests
-from bs4 import BeautifulSoup
-import re
+import pandas as pd
 import json
+import os
 from datetime import datetime
 
-def fetch():
-    data = []
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    }
+def fetch_legulegu_north():
+    print(f"[{datetime.now()}] 开始从乐咕乐股抓取北向资金数据...")
     
     url = "https://www.legulegu.com/stockdata/hk-to-a"
-    print(f"正在抓取: {url}")
     
-    res = requests.get(url, headers=headers, timeout=15)
-    print(f"状态码: {res.status_code}")
-    print(f"页面长度: {len(res.text)} 字符")
-    
-    if res.status_code != 200:
-        raise Exception(f"HTTP {res.status_code}")
-    
-    soup = BeautifulSoup(res.text, 'html.parser')
-    
-    # 查找所有表格
-    tables = soup.find_all('table')
-    print(f"找到 {len(tables)} 个 table 标签")
-    
-    for idx, table in enumerate(tables):
-        rows = table.find_all('tr')
-        print(f"  表格{idx+1}: 找到 {len(rows)} 行 (tr)")
-        
-        for r_idx, row in enumerate(rows):
-            cells_td = row.find_all('td')
-            cells_th = row.find_all('th')
-            all_cells = cells_td + cells_th
-            
-            if len(all_cells) >= 1:
-                texts = [cell.get_text(strip=True) for cell in all_cells]
-                first = texts[0] if texts else ""
-                
-                # 判断是否是日期行
-                if re.match(r'^20\d{2}-\d{2}-\d{2}$', first):
-                    print(f"    → 数据行: {texts}")
-                    if len(texts) >= 4:
-                        total = _num(texts[1])
-                        hgt = _num(texts[2])
-                        sgt = _num(texts[3])
-                        data.append({
-                            "date": first,
-                            "total": total,
-                            "hgt": hgt,
-                            "sgt": sgt
-                        })
-    
-    # 排序（日期降序）
-    data.sort(key=lambda x: x['date'], reverse=True)
-    data = data[:20]  # 只取最近20天
-    
-    # 计算 compare
-    for i in range(1, len(data)):
-        try:
-            data[i]["compare"] = round(data[i]["total"] - data[i-1]["total"], 2)
-        except:
-            data[i]["compare"] = None
-    
-    if data:
-        data[0]["compare"] = None
-    
-    result = {
-        "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "north_fund": data
+    # 伪装成浏览器，防止被网站拦截
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
     }
-    
-    with open('data/north_fund.json', 'w', encoding='utf-8') as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
-    
-    print(f"\n✅ 北向资金抓取完成，共 {len(data)} 条")
-    for d in data:
-        print(f"   {d['date']} | 北向:{d['total']}亿 | 沪股通:{d['hgt']}亿 | 深股通:{d['sgt']}亿")
-    return len(data)
 
-def _num(text):
-    match = re.search(r'(-?\d+\.?\d*)', str(text))
-    return round(float(match.group(1)), 2) if match else 0.0
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        response.raise_for_status() # 检查请求是否成功
+        
+        # 使用 pandas 直接读取网页中的所有表格
+        dfs = pd.read_html(response.text)
+        
+        # 寻找包含“北向资金”的那个表格
+        target_df = None
+        for df in dfs:
+            if '北向资金' in df.columns or '日期' in df.columns:
+                target_df = df
+                break
+        
+        if target_df is None:
+            print("未在网页中找到北向资金的表格，网站结构可能已改变。")
+            return
+
+        # 只取前 20 行（最新的20天）
+        target_df = target_df.head(20)
+        
+        data_list = []
+        for index, row in target_df.iterrows():
+            date_str = str(row['日期'])
+            
+            # 清洗数据：把 "3131.78亿" 转换为纯数字 313178000000
+            def clean_money(val):
+                if pd.isna(val) or val == '-': return 0.0
+                val_str = str(val).replace('亿', '').replace(',', '')
+                try:
+                    return float(val_str) * 100000000 # 乘以一亿
+                except:
+                    return 0.0
+
+            item = {
+                "date": date_str,
+                "north_total": clean_money(row['北向资金']),
+                "north_sh": clean_money(row['沪股通']),
+                "north_sz": clean_money(row['深股通'])
+            }
+            data_list.append(item)
+            
+        # 获取当前脚本所在目录的上一级（即项目根目录），确保存在 data 文件夹
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        data_dir = os.path.join(base_dir, 'data')
+        os.makedirs(data_dir, exist_ok=True)
+        
+        # 保存为 JSON
+        output_path = os.path.join(data_dir, 'north_data.json')
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(data_list, f, ensure_ascii=False, indent=2)
+            
+        print(f"成功抓取并保存 {len(data_list)} 条数据到 {output_path}")
+
+    except Exception as e:
+        print(f"抓取失败: {e}")
 
 if __name__ == "__main__":
-    fetch()
-
+    fetch_legulegu_north()
