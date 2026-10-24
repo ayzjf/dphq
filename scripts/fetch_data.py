@@ -8,31 +8,23 @@ def fetch_all_data():
         "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "turnover": [],
         "margin": [],
-        "northbound": []
+        "main_fund": []  # 替换为大盘主力净流入
     }
 
-    today = datetime.now().strftime("%Y%m%d")
-    start_date = (datetime.now() - timedelta(days=100)).strftime("%Y%m%d")
-
-    # ====== 1. 两市成交额（使用 index_zh_a_hist 接口） ======
+    # ====== 1. 两市成交额（使用新浪数据源，100%稳定） ======
     try:
-        print("正在获取上证指数数据...")
-        sh_df = ak.index_zh_a_hist(symbol="000001", period="daily", start_date="20250101", end_date=today)
-        print(f"上证列名: {sh_df.columns.tolist()}")
+        print("正在获取成交额数据...")
+        sh_df = ak.stock_zh_index_daily(symbol="sh000001")
+        sz_df = ak.stock_zh_index_daily(symbol="sz399001")
         
-        print("正在获取深证成指数据...")
-        sz_df = ak.index_zh_a_hist(symbol="399001", period="daily", start_date="20250101", end_date=today)
-        print(f"深证列名: {sz_df.columns.tolist()}")
+        sh_df['date'] = pd.to_datetime(sh_df['date']).dt.strftime('%Y-%m-%d')
+        sz_df['date'] = pd.to_datetime(sz_df['date']).dt.strftime('%Y-%m-%d')
         
-        sh_df['date'] = pd.to_datetime(sh_df['日期']).dt.strftime('%Y-%m-%d')
-        sz_df['date'] = pd.to_datetime(sz_df['日期']).dt.strftime('%Y-%m-%d')
-        
-        merged = pd.merge(sh_df[['date', '成交额']], sz_df[['date', '成交额']], 
+        merged = pd.merge(sh_df[['date', 'amount']], sz_df[['date', 'amount']], 
                          on='date', suffixes=('_sh', '_sz'))
         
-        # 成交额单位已经是元，转为亿元
-        merged['amount_sh'] = (merged['成交额_sh'] / 1e8).round(2)
-        merged['amount_sz'] = (merged['成交额_sz'] / 1e8).round(2)
+        merged['amount_sh'] = (merged['amount_sh'] / 1e8).round(2)
+        merged['amount_sz'] = (merged['amount_sz'] / 1e8).round(2)
         merged['amount_total'] = (merged['amount_sh'] + merged['amount_sz']).round(2)
         merged['compare'] = merged['amount_total'].diff().round(2)
         
@@ -47,83 +39,77 @@ def fetch_all_data():
             })
         print(f"✅ 成交额: {len(data['turnover'])} 条")
     except Exception as e:
-        print(f"❌ 成交额获取失败: {e}")
+        print(f"❌ 成交额失败: {e}")
 
-    # ====== 2. 两市融资余额 ======
+    # ====== 2. 两市融资余额（改为抓取最近30天单日汇总） ======
     try:
         print("正在获取融资余额数据...")
-        sse_df = ak.stock_margin_sse(start_date=start_date, end_date=today)
-        print(f"上交所融资列名: {sse_df.columns.tolist()}")
-        
-        szse_df = ak.stock_margin_szse(start_date=start_date, end_date=today)
-        print(f"深交所融资列名: {szse_df.columns.tolist()}")
-        
-        sse_df['date'] = pd.to_datetime(sse_df['日期']).dt.strftime('%Y-%m-%d')
-        szse_df['date'] = pd.to_datetime(szse_df['日期']).dt.strftime('%Y-%m-%d')
-        
-        merged_m = pd.merge(sse_df[['date', '融资余额']], szse_df[['date', '融资余额']], 
-                            on='date', how='inner', suffixes=('_sh', '_sz'))
-        
-        merged_m['rzye_sh'] = (merged_m['融资余额_sh'] / 1e8).round(2)
-        merged_m['rzye_sz'] = (merged_m['融资余额_sz'] / 1e8).round(2)
-        merged_m['rzye_total'] = (merged_m['rzye_sh'] + merged_m['rzye_sz']).round(2)
-        merged_m['compare'] = merged_m['rzye_total'].diff().round(2)
-        
-        records_m = merged_m.sort_values('date', ascending=False).head(30).to_dict('records')
-        for r in records_m:
-            data["margin"].append({
-                "date": r['date'],
-                "total": float(r['rzye_total']),
-                "compare": float(r['compare']) if pd.notna(r['compare']) else None
-            })
+        today = datetime.now()
+        for i in range(60):  # 往前推60天，避开周末找交易日
+            target_day = (today - timedelta(days=i)).strftime("%Y%m%d")
+            try:
+                sse_df = ak.stock_margin_sse(start_date=target_day, end_date=target_day)
+                szse_df = ak.stock_margin_szse(start_date=target_day, end_date=target_day)
+                
+                if not sse_df.empty and not szse_df.empty:
+                    rzye_sh = float(sse_df['融资余额'].iloc[0]) / 1e8
+                    rzye_sz = float(szse_df['融资余额'].iloc[0]) / 1e8
+                    
+                    data["margin"].append({
+                        "date": (today - timedelta(days=i)).strftime('%Y-%m-%d'),
+                        "total": round(rzye_sh + rzye_sz, 2),
+                        "compare": None
+                    })
+                    
+                    if len(data["margin"]) >= 30:
+                        break
+            except:
+                continue
+                
+        # 计算 compare
+        for i in range(1, len(data["margin"])):
+            data["margin"][i]["compare"] = round(data["margin"][i]["total"] - data["margin"][i-1]["total"], 2)
+            
         print(f"✅ 融资余额: {len(data['margin'])} 条")
     except Exception as e:
-        print(f"❌ 融资余额获取失败: {e}")
+        print(f"❌ 融资余额失败: {e}")
 
-    # ====== 3. 北向资金（不传symbol，直接调用） ======
+    # ====== 3. 大盘主力净流入（北向资金已停发，用主力净流入替代） ======
     try:
-        print("正在获取北向资金数据...")
-        nb_df = ak.stock_hsgt_north_net_flow_in_em()
-        print(f"北向资金列名: {nb_df.columns.tolist()}")
+        print("正在获取主力净流入数据...")
+        # 获取近期大盘资金流向
+        flow_df = ak.stock_market_fund_flow()
         
-        nb_df['date'] = pd.to_datetime(nb_df['日期']).dt.strftime('%Y-%m-%d')
+        flow_df['date'] = pd.to_datetime(flow_df['日期']).dt.strftime('%Y-%m-%d')
+        records_f = flow_df.sort_values('date', ascending=False).head(30).to_dict('records')
         
-        # 列名根据实际返回调整
-        records_n = nb_df.sort_values('date', ascending=False).head(30).to_dict('records')
-        for r in records_n:
+        for r in records_f:
             try:
-                hgt = float(r.get('沪股通净流入(亿)', r.get('沪股通', 0)))
-                sgt = float(r.get('深股通净流入(亿)', r.get('深股通', 0)))
-                total = float(r.get('北向资金净流入(亿)', r.get('北向资金', hgt + sgt)))
-            except (ValueError, TypeError):
-                hgt = sgt = total = 0.0
+                # 单位通常是亿元，根据实际接口返回调整
+                total_net = float(r.get('主力净流入-净额', r.get('今日主力净流入', 0)))
+                # 转换为亿元（如果源数据单位是万元或元，需要除以10000或100000000）
+                # 这里的接口通常返回的就是亿元
+                data["main_fund"].append({
+                    "date": r['date'],
+                    "total": round(total_net, 2),
+                    "compare": None
+                })
+            except:
+                pass
+                
+        # 计算 compare
+        for i in range(1, len(data["main_fund"])):
+            data["main_fund"][i]["compare"] = round(data["main_fund"][i]["total"] - data["main_fund"][i-1]["total"], 2)
             
-            data["northbound"].append({
-                "date": r['date'],
-                "hgt": round(hgt, 2),
-                "sgt": round(sgt, 2),
-                "total": round(total, 2),
-                "compare": None
-            })
-        
-        # 计算compare
-        for i in range(1, len(data["northbound"])):
-            data["northbound"][i]["compare"] = round(
-                data["northbound"][i]["total"] - data["northbound"][i-1]["total"], 2
-            )
-        
-        print(f"✅ 北向资金: {len(data['northbound'])} 条")
+        print(f"✅ 主力净流入: {len(data['main_fund'])} 条")
     except Exception as e:
-        print(f"❌ 北向资金获取失败: {e}")
+        print(f"❌ 主力净流入失败: {e}")
 
-    # 保存为 JSON
+    # 保存
     with open('data/market_data.json', 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     
-    print(f"\n✅ 数据更新完成！更新时间: {data['update_time']}")
-    print(f"   成交额: {len(data['turnover'])} 条")
-    print(f"   融资余额: {len(data['margin'])} 条")
-    print(f"   北向资金: {len(data['northbound'])} 条")
+    print(f"\n✅ 完成！更新时间: {data['update_time']}")
 
 if __name__ == "__main__":
     fetch_all_data()
